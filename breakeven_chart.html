@@ -111,7 +111,7 @@ h2 { font-size: 16px; font-weight: 900; margin-bottom: 2px; }
 <div class="legend">
   <div class="legend-item"><span class="legend-swatch" style="background:#cfcfcf"></span>P5&ndash;P95 range</div>
   <div class="legend-item"><span class="legend-swatch" style="background:#0a0a0a"></span>P25&ndash;P75 range</div>
-  <div class="legend-item"><span class="legend-swatch" style="background:#1e7d3c;border-radius:50%;width:8px;height:8px"></span>Median required premium</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#1e7d3c;border-radius:50%;width:8px;height:8px"></span>Simulated median (anchor breakeven: 22.5% JFK / 23.1% LHR)</div>
 </div>
 
 <div class="axis-caption">Scale: 0% to 40% required premium over one-stop fare</div>
@@ -152,7 +152,7 @@ Object.values(routes).forEach(r => {
   const label = document.createElement('div');
   label.className = 'median-label';
   label.style.left = pct(r.median) + '%';
-  label.textContent = r.median.toFixed(1) + '%';
+  label.textContent = 'Simulated median ' + r.median.toFixed(1) + '%';
   chart.appendChild(label);
 
   const axis = document.getElementById(r.axis);
