@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Required Break-Even Premium</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: Arial, sans-serif;
+  color: #0a0a0a;
+  background: #ffffff;
+  padding: 36px 32px 28px;
+  max-width: 680px;
+}
+h2 { font-size: 16px; font-weight: 900; margin-bottom: 2px; }
+.sub { font-size: 12px; color: #777777; margin-bottom: 32px; }
+.row { margin-bottom: 30px; }
+.row-label {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.chart-area { position: relative; height: 46px; }
+.axis-track {
+  position: absolute;
+  top: 22px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #dddddd;
+}
+.range-bar {
+  position: absolute;
+  top: 18px;
+  height: 8px;
+  border-radius: 4px;
+  background: #cfcfcf;
+}
+.iqr-bar {
+  position: absolute;
+  top: 16px;
+  height: 12px;
+  border-radius: 6px;
+  background: #0a0a0a;
+}
+.median-dot {
+  position: absolute;
+  top: 12px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #1e7d3c;
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 0 1px #1e7d3c;
+}
+.median-label {
+  position: absolute;
+  top: -22px;
+  font-size: 13px;
+  font-weight: 900;
+  color: #1e7d3c;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+.axis-labels {
+  position: relative;
+  height: 18px;
+  margin-top: 6px;
+}
+.axis-tick {
+  position: absolute;
+  font-size: 11px;
+  color: #999999;
+  transform: translateX(-50%);
+}
+.legend {
+  display: flex;
+  gap: 22px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #777777;
+}
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.legend-swatch { width: 12px; height: 8px; border-radius: 4px; }
+.axis-caption {
+  font-size: 11px;
+  color: #999999;
+  margin-top: 26px;
+  border-top: 1px solid #eeeeee;
+  padding-top: 10px;
+}
+</style>
+</head>
+<body>
+
+<h2>Required break-even premium</h2>
+<div class="sub">SYD&ndash;JFK vs SYD&ndash;LHR &middot; percent premium over one-stop fare</div>
+
+<div class="row">
+  <div class="row-label">SYD&ndash;JFK</div>
+  <div class="chart-area" id="jfkChart"></div>
+  <div class="axis-labels" id="jfkAxis"></div>
+</div>
+
+<div class="row">
+  <div class="row-label">SYD&ndash;LHR</div>
+  <div class="chart-area" id="lhrChart"></div>
+  <div class="axis-labels" id="lhrAxis"></div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><span class="legend-swatch" style="background:#cfcfcf"></span>P5&ndash;P95 range</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#0a0a0a"></span>P25&ndash;P75 range</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#1e7d3c;border-radius:50%;width:8px;height:8px"></span>Median required premium</div>
+</div>
+
+<div class="axis-caption">Scale: 0% to 40% required premium over one-stop fare</div>
+
+<script>
+const SCALE_MIN = 0, SCALE_MAX = 40;
+function pct(val) { return ((val - SCALE_MIN) / (SCALE_MAX - SCALE_MIN)) * 100; }
+
+const routes = {
+  jfk: { chart: 'jfkChart', axis: 'jfkAxis', p5: 10.4, p25: 17.4, median: 22.3, p75: 27.8, p95: 35.6 },
+  lhr: { chart: 'lhrChart', axis: 'lhrAxis', p5: 11.2, p25: 18.2, median: 23.3, p75: 28.4, p95: 36.3 }
+};
+
+Object.values(routes).forEach(r => {
+  const chart = document.getElementById(r.chart);
+
+  const track = document.createElement('div');
+  track.className = 'axis-track';
+  chart.appendChild(track);
+
+  const rangeBar = document.createElement('div');
+  rangeBar.className = 'range-bar';
+  rangeBar.style.left = pct(r.p5) + '%';
+  rangeBar.style.width = (pct(r.p95) - pct(r.p5)) + '%';
+  chart.appendChild(rangeBar);
+
+  const iqrBar = document.createElement('div');
+  iqrBar.className = 'iqr-bar';
+  iqrBar.style.left = pct(r.p25) + '%';
+  iqrBar.style.width = (pct(r.p75) - pct(r.p25)) + '%';
+  chart.appendChild(iqrBar);
+
+  const dot = document.createElement('div');
+  dot.className = 'median-dot';
+  dot.style.left = 'calc(' + pct(r.median) + '% - 10px)';
+  chart.appendChild(dot);
+
+  const label = document.createElement('div');
+  label.className = 'median-label';
+  label.style.left = pct(r.median) + '%';
+  label.textContent = r.median.toFixed(1) + '%';
+  chart.appendChild(label);
+
+  const axis = document.getElementById(r.axis);
+  [0, 10, 20, 30, 40].forEach(t => {
+    const tick = document.createElement('div');
+    tick.className = 'axis-tick';
+    tick.style.left = pct(t) + '%';
+    tick.textContent = t + '%';
+    axis.appendChild(tick);
+  });
+});
+</script>
+
+</body>
+</html>

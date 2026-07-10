@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; padding: 24px 28px 18px; max-width: 640px; }
+.label { font-size: 12px; color: #777777; margin-bottom: 14px; }
+.strip { position: relative; height: 40px; }
+.track { position: absolute; top: 18px; left: 0; right: 0; height: 6px; background: #eeeeee; border-radius: 3px; }
+.range { position: absolute; top: 18px; height: 6px; border-radius: 3px; background: #0a0a0a; left: 18%; width: 22%; }
+.marker { position: absolute; top: 8px; width: 3px; height: 26px; background: #1e7d3c; left: 27.5%; }
+.marker-label { position: absolute; top: -20px; left: 27.5%; transform: translateX(-50%); font-size: 12px; font-weight: 900; color: #1e7d3c; white-space: nowrap; }
+.endlabels { position: relative; height: 16px; margin-top: 4px; font-size: 11px; color: #999999; }
+.end-left { position: absolute; left: 18%; }
+.end-right { position: absolute; left: 40%; }
+</style>
+</head>
+<body>
+<div class="label">Observed willingness to pay vs. what Sunrise requires</div>
+<div class="strip">
+  <div class="track"></div>
+  <div class="range"></div>
+  <div class="marker"></div>
+  <div class="marker-label">Sunrise needs 22.6%</div>
+</div>
+<div class="endlabels">
+  <span class="end-left">18%</span>
+  <span class="end-right">22%</span>
+</div>
+</body>
+</html>

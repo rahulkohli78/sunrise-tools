@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Combined Shock Explorer</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: Arial, sans-serif;
+  color: #0a0a0a;
+  background: #ffffff;
+  padding: 32px 28px;
+  max-width: 640px;
+}
+h2 {
+  font-size: 18px;
+  font-weight: 900;
+  margin-bottom: 4px;
+}
+.sub {
+  font-size: 13px;
+  color: #555555;
+  margin-bottom: 24px;
+}
+.control {
+  margin-bottom: 22px;
+}
+.control-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.control-value {
+  font-weight: 900;
+}
+input[type="range"] {
+  width: 100%;
+  accent-color: #0a0a0a;
+}
+.results {
+  margin-top: 28px;
+  border-top: 2px solid #0a0a0a;
+  padding-top: 18px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+th, td {
+  text-align: left;
+  padding: 8px 6px;
+  border-bottom: 1px solid #dddddd;
+}
+th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #555555;
+  font-weight: 700;
+}
+td.num {
+  font-weight: 900;
+  font-size: 16px;
+}
+.zone-base { color: #0a0a0a; }
+.zone-p75 { color: #b8860b; }
+.zone-p95 { color: #b3261e; }
+.note {
+  margin-top: 16px;
+  font-size: 12px;
+  color: #555555;
+  line-height: 1.5;
+}
+</style>
+</head>
+<body>
+
+<h2>Combined Shock Explorer</h2>
+<div class="sub">Fuel price and premium-cabin fare discount, applied together. Required premium recalculated directly from the unit economics build.</div>
+
+<div class="control">
+  <div class="control-label">
+    <span>Fuel price</span>
+    <span class="control-value" id="fuelVal">$0.80/kg</span>
+  </div>
+  <input type="range" id="fuelSlider" min="0.60" max="1.20" step="0.01" value="0.90">
+</div>
+
+<div class="control">
+  <div class="control-label">
+    <span>Premium cabin fare discount (J/F)</span>
+    <span class="control-value" id="fareVal">0%</span>
+  </div>
+  <input type="range" id="fareSlider" min="0" max="15" step="1" value="5">
+</div>
+
+<div class="results">
+  <table>
+    <thead>
+      <tr><th>Route</th><th>Required premium</th><th>vs anchor</th><th>Stress zone</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>SYD-JFK</td>
+        <td class="num" id="jfkPremium">22.5%</td>
+        <td id="jfkDelta">+0.0 pts</td>
+        <td id="jfkZone">Base</td>
+      </tr>
+      <tr>
+        <td>SYD-LHR</td>
+        <td class="num" id="lhrPremium">23.1%</td>
+        <td id="lhrDelta">+0.0 pts</td>
+        <td id="lhrZone">Base</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="note">Stress zone reflects where the resulting premium falls against each route's Monte Carlo distribution: Base (below P75), P75+ (27.8% JFK / 28.4% LHR), P95+ (35.6% JFK / 36.3% LHR).</div>
+</div>
+
+<script>
+const routes = {
+  "SYD-JFK": {
+    distance: 16020,
+    fuelIntensity: 32,
+    seats: { Y: 140, W: 40, J: 52, F: 6 },
+    fares: { Y: 1640, W: 2732.5, J: 6641.975, F: 12821.25 },
+    lf: { Y: 0.90, W: 0.90, J: 0.82, F: 0.70 },
+    exFuelCask: 8.5,
+    overflight: 11000,
+    etsPrice: 60, etsShare: 0.20,
+    opsAdders: 12000,
+    cargoPayload: 10, cargoYield: 0.33,
+    anchorPremium: 22.5, p75: 27.8, p95: 35.6
+  },
+  "SYD-LHR": {
+    distance: 17020,
+    fuelIntensity: 32,
+    seats: { Y: 140, W: 40, J: 52, F: 6 },
+    fares: { Y: 1701, W: 2890, J: 7042.294, F: 13552.5 },
+    lf: { Y: 0.90, W: 0.90, J: 0.82, F: 0.70 },
+    exFuelCask: 8.5,
+    overflight: 13000,
+    etsPrice: 65, etsShare: 0.30,
+    opsAdders: 12000,
+    cargoPayload: 10, cargoYield: 0.35,
+    anchorPremium: 23.1, p75: 28.4, p95: 36.3
+  }
+};
+
+function breakeven(r, fuelPrice, jfFareMult) {
+  const totalSeats = Object.values(r.seats).reduce((a,b)=>a+b,0);
+  const ask = totalSeats * r.distance;
+  const fuelKg = r.fuelIntensity * ask / 1000;
+
+  let paxRev1x = 0;
+  for (const cabin of ["Y","W","J","F"]) {
+    let fare = r.fares[cabin];
+    if (cabin === "J" || cabin === "F") fare = fare * jfFareMult;
+    paxRev1x += r.seats[cabin] * r.lf[cabin] * (fare/2);
+  }
+
+  const cargoRev = r.cargoPayload * r.distance * r.cargoYield;
+  const fuelCost = fuelKg * fuelPrice;
+  const exFuelCost = (r.exFuelCask/100) * ask;
+  const etsCost = (fuelKg/1000) * r.etsPrice * r.etsShare;
+  const totalCost = fuelCost + exFuelCost + r.overflight + etsCost + r.opsAdders;
+
+  return (totalCost - cargoRev) / paxRev1x;
+}
+
+function zoneFor(pct, r) {
+  if (pct >= r.p95) return ["P95+", "zone-p95"];
+  if (pct >= r.p75) return ["P75+", "zone-p75"];
+  return ["Base", "zone-base"];
+}
+
+function update() {
+  const fuelPrice = parseFloat(document.getElementById("fuelSlider").value);
+  const fareDiscount = parseFloat(document.getElementById("fareSlider").value);
+  const jfFareMult = 1 - (fareDiscount / 100);
+
+  document.getElementById("fuelVal").textContent = "$" + fuelPrice.toFixed(2) + "/kg";
+  document.getElementById("fareVal").textContent = fareDiscount + "%";
+
+  const jfkPct = (breakeven(routes["SYD-JFK"], fuelPrice, jfFareMult) - 1) * 100;
+  const lhrPct = (breakeven(routes["SYD-LHR"], fuelPrice, jfFareMult) - 1) * 100;
+
+  document.getElementById("jfkPremium").textContent = jfkPct.toFixed(1) + "%";
+  document.getElementById("lhrPremium").textContent = lhrPct.toFixed(1) + "%";
+
+  const jfkDelta = jfkPct - routes["SYD-JFK"].anchorPremium;
+  const lhrDelta = lhrPct - routes["SYD-LHR"].anchorPremium;
+  document.getElementById("jfkDelta").textContent = (jfkDelta >= 0 ? "+" : "") + jfkDelta.toFixed(1) + " pts";
+  document.getElementById("lhrDelta").textContent = (lhrDelta >= 0 ? "+" : "") + lhrDelta.toFixed(1) + " pts";
+
+  const [jfkZoneText, jfkZoneClass] = zoneFor(jfkPct, routes["SYD-JFK"]);
+  const [lhrZoneText, lhrZoneClass] = zoneFor(lhrPct, routes["SYD-LHR"]);
+  const jfkZoneEl = document.getElementById("jfkZone");
+  const lhrZoneEl = document.getElementById("lhrZone");
+  jfkZoneEl.textContent = jfkZoneText;
+  jfkZoneEl.className = jfkZoneClass;
+  lhrZoneEl.textContent = lhrZoneText;
+  lhrZoneEl.className = lhrZoneClass;
+}
+
+document.getElementById("fuelSlider").addEventListener("input", update);
+document.getElementById("fareSlider").addEventListener("input", update);
+update();
+</script>
+
+</body>
+</html>
