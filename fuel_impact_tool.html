@@ -51,6 +51,13 @@ input[type="range"] { width: 100%; accent-color: #0a0a0a; margin-bottom: 6px; }
 .diff { text-align: center; font-size: 14px; color: #333333; }
 .diff b { color: #1e7d3c; }
 .premium-note { text-align: center; font-size: 11px; color: #999999; margin-top: 10px; }
+.choice-section { margin-top: 26px; }
+.choice-label { text-align: center; font-size: 14px; font-weight: 700; margin-bottom: 14px; }
+.choice-boxes { display: flex; gap: 10px; }
+.choice-box { flex: 1; border: 2px solid #e5e5e5; border-radius: 8px; padding: 14px 12px; text-align: center; }
+.choice-fare { font-weight: 900; font-size: 15px; margin-bottom: 6px; }
+.choice-fare.nonstop { color: #1e7d3c; }
+.choice-detail { font-size: 11px; color: #777777; line-height: 1.4; }
 </style>
 </head>
 <body>
@@ -89,6 +96,20 @@ input[type="range"] { width: 100%; accent-color: #0a0a0a; margin-bottom: 6px; }
   </div>
   <div class="diff">That's <b id="diffAmount">$369</b> more, a <b id="diffPct">22.5%</b> premium</div>
   <div class="premium-note">Same required premium applies across every cabin on this route</div>
+</div>
+
+<div class="choice-section">
+  <div class="choice-label">Which would you choose?</div>
+  <div class="choice-boxes">
+    <div class="choice-box">
+      <div class="choice-fare" id="choiceOneStopFare">$1,640, one-stop</div>
+      <div class="choice-detail">2&ndash;4 hours longer (save <span id="choiceSaveAmount">$369</span> vs. nonstop)</div>
+    </div>
+    <div class="choice-box">
+      <div class="choice-fare nonstop" id="choiceNonstopFare">$2,009, nonstop</div>
+      <div class="choice-detail">2&ndash;4 hours faster (<span id="choiceMoreAmount">$369</span> more vs. one-stop)</div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -150,6 +171,11 @@ function update() {
   document.getElementById('nonstopFare').textContent = '$' + nonstop.toLocaleString();
   document.getElementById('diffAmount').textContent = '$' + diff.toLocaleString();
   document.getElementById('diffPct').textContent = premiumPct.toFixed(1) + '%';
+
+  document.getElementById('choiceOneStopFare').textContent = '$' + oneStop.toLocaleString() + ', one-stop';
+  document.getElementById('choiceNonstopFare').textContent = '$' + nonstop.toLocaleString() + ', nonstop';
+  document.getElementById('choiceSaveAmount').textContent = '$' + diff.toLocaleString();
+  document.getElementById('choiceMoreAmount').textContent = '$' + diff.toLocaleString();
 }
 
 document.querySelectorAll('.route-btn').forEach(btn => {
