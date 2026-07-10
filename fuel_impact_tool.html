@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fuel Impact Tool</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: Arial, sans-serif;
+  color: #0a0a0a;
+  background: #ffffff;
+  padding: 28px 26px;
+  max-width: 620px;
+}
+.step-label {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #1e7d3c;
+  margin-bottom: 10px;
+  margin-top: 26px;
+}
+.step-label:first-child { margin-top: 0; }
+.route-toggle, .cabin-toggle { display: flex; gap: 8px; flex-wrap: wrap; }
+.route-btn, .cabin-btn {
+  flex: 1;
+  min-width: 70px;
+  text-align: center;
+  padding: 11px 6px;
+  font-weight: 700;
+  font-size: 13px;
+  border: 2px solid #e5e5e5;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #555555;
+}
+.route-btn.active, .cabin-btn.active { border-color: #1e7d3c; color: #1e7d3c; background: #f3f9f4; }
+.fuel-readout { text-align: center; font-size: 15px; margin: 12px 0 10px; }
+.fuel-readout b { font-size: 17px; color: #1e7d3c; }
+input[type="range"] { width: 100%; accent-color: #0a0a0a; margin-bottom: 6px; }
+.tick-row { display: flex; justify-content: space-between; font-size: 11px; color: #999999; }
+.results { border-top: 2px solid #0a0a0a; padding-top: 18px; margin-top: 28px; }
+.results-label { text-align: center; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #999999; margin-bottom: 14px; }
+.fares { display: flex; justify-content: space-around; align-items: center; margin-bottom: 14px; }
+.fare-block { text-align: center; }
+.fare-label { font-size: 12px; color: #777777; margin-bottom: 4px; }
+.fare-value { font-size: 24px; font-weight: 900; }
+.fare-value.nonstop { color: #1e7d3c; }
+.arrow { font-size: 18px; color: #999999; }
+.diff { text-align: center; font-size: 14px; color: #333333; }
+.diff b { color: #1e7d3c; }
+.premium-note { text-align: center; font-size: 11px; color: #999999; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<div class="step-label">Step 1 &mdash; Pick the route</div>
+<div class="route-toggle">
+  <div class="route-btn active" data-route="jfk">Sydney &ndash; New York</div>
+  <div class="route-btn" data-route="lhr">Sydney &ndash; London</div>
+</div>
+
+<div class="step-label">Step 2 &mdash; Pick the cabin</div>
+<div class="cabin-toggle">
+  <div class="cabin-btn active" data-cabin="Y">Economy</div>
+  <div class="cabin-btn" data-cabin="W">Prem. Economy</div>
+  <div class="cabin-btn" data-cabin="J">Business</div>
+  <div class="cabin-btn" data-cabin="F">First</div>
+</div>
+
+<div class="step-label">Step 3 &mdash; Fuel price vs. $0.80/kg baseline</div>
+<div class="fuel-readout">Fuel is <b id="fuelPctLabel">0%</b> above baseline</div>
+<input type="range" id="fuelSlider" min="0" max="50" step="1" value="0">
+<div class="tick-row"><span>0%</span><span>10%</span><span>20%</span><span>30%</span><span>40%</span><span>50%</span></div>
+
+<div class="results">
+  <div class="results-label">What that does to the fare</div>
+  <div class="fares">
+    <div class="fare-block">
+      <div class="fare-label">One-stop fare</div>
+      <div class="fare-value" id="oneStopFare">$1,640</div>
+    </div>
+    <div class="arrow">&rarr;</div>
+    <div class="fare-block">
+      <div class="fare-label">Nonstop fare needed</div>
+      <div class="fare-value nonstop" id="nonstopFare">$2,009</div>
+    </div>
+  </div>
+  <div class="diff">That's <b id="diffAmount">$369</b> more, a <b id="diffPct">22.5%</b> premium</div>
+  <div class="premium-note">Same required premium applies across every cabin on this route</div>
+</div>
+
+<script>
+const routes = {
+  jfk: {
+    distance: 16020,
+    seats: { Y: 140, W: 40, J: 52, F: 6 },
+    fares: { Y: 1640, W: 2732.5, J: 6641.975, F: 12821.25 },
+    lf: { Y: 0.90, W: 0.90, J: 0.82, F: 0.70 },
+    exFuelCask: 8.5, overflight: 11000, etsPrice: 60, etsShare: 0.20, opsAdders: 12000,
+    cargoPayload: 10, cargoYield: 0.33
+  },
+  lhr: {
+    distance: 17020,
+    seats: { Y: 140, W: 40, J: 52, F: 6 },
+    fares: { Y: 1701, W: 2890, J: 7042.294, F: 13552.5 },
+    lf: { Y: 0.90, W: 0.90, J: 0.82, F: 0.70 },
+    exFuelCask: 8.5, overflight: 13000, etsPrice: 65, etsShare: 0.30, opsAdders: 12000,
+    cargoPayload: 10, cargoYield: 0.35
+  }
+};
+
+let currentRoute = 'jfk';
+let currentCabin = 'Y';
+
+function breakeven(r, fuelPrice) {
+  const totalSeats = Object.values(r.seats).reduce((a,b)=>a+b,0);
+  const ask = totalSeats * r.distance;
+  const fuelKg = 32 * ask / 1000;
+
+  let paxRev1x = 0;
+  for (const cabin of ["Y","W","J","F"]) {
+    paxRev1x += r.seats[cabin] * r.lf[cabin] * (r.fares[cabin]/2);
+  }
+
+  const cargoRev = r.cargoPayload * r.distance * r.cargoYield;
+  const fuelCost = fuelKg * fuelPrice;
+  const exFuelCost = (r.exFuelCask/100) * ask;
+  const etsCost = (fuelKg/1000) * r.etsPrice * r.etsShare;
+  const totalCost = fuelCost + exFuelCost + r.overflight + etsCost + r.opsAdders;
+
+  return (totalCost - cargoRev) / paxRev1x;
+}
+
+function update() {
+  const fuelPct = parseInt(document.getElementById('fuelSlider').value);
+  const fuelPrice = 0.80 * (1 + fuelPct/100);
+  const r = routes[currentRoute];
+
+  document.getElementById('fuelPctLabel').textContent = fuelPct + '%';
+
+  const premium = breakeven(r, fuelPrice);
+  const premiumPct = (premium - 1) * 100;
+  const oneStop = Math.round(r.fares[currentCabin]);
+  const nonstop = Math.round(oneStop * premium);
+  const diff = nonstop - oneStop;
+
+  document.getElementById('oneStopFare').textContent = '$' + oneStop.toLocaleString();
+  document.getElementById('nonstopFare').textContent = '$' + nonstop.toLocaleString();
+  document.getElementById('diffAmount').textContent = '$' + diff.toLocaleString();
+  document.getElementById('diffPct').textContent = premiumPct.toFixed(1) + '%';
+}
+
+document.querySelectorAll('.route-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.route-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentRoute = btn.dataset.route;
+    update();
+  });
+});
+
+document.querySelectorAll('.cabin-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cabin-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentCabin = btn.dataset.cabin;
+    update();
+  });
+});
+
+document.getElementById('fuelSlider').addEventListener('input', update);
+update();
+</script>
+
+</body>
+</html>
